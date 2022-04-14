@@ -1,0 +1,167 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.4.613.9944",
+      "templateHash": "7822315097766237434"
+    }
+  },
+  "parameters": {
+
+    "adminPassword": {
+      "type": "secureString",
+      "minLength": 12,
+      "metadata": {
+        "description": "Password for the Virtual Machine."
+      }
+    },
+
+    "OSVersion": {
+      "type": "string",
+      "defaultValue": "win10-21h2-ent-g2",
+      "allowedValues": [
+        "win10-21h2-ent-g2"        
+      ],
+      "metadata": {
+        "description": "The Windows version for the VM. This will pick a fully patched Gen2 image of this given Windows version."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_E4ds_v5",
+      "metadata": {
+        "description": "Size of the virtual machine."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "vmName": {
+      "type": "string",
+      "defaultValue": "simple-vm",
+      "metadata": {
+        "description": "Name of the virtual machine."
+      }
+    },
+    "virtualNetworkName": {
+        "type": "string",
+        "defaultValue": "vnet-trn",
+        "metadata": {
+          "description": "Name of the existing VNET"
+        }
+      },
+      "virtualNetworkResourceGroup": {
+        "type": "string",
+        "defaultValue": "rg-trn-network",
+        "metadata": {
+          "description": "Name of the existing VNET resource group"
+        }
+      },
+      "subnetName": {
+        "type": "string",
+        "defaultValue": "Subnet-trn",
+        "metadata": {
+          "description": "Name of the subnet in the virtual network you want to use"
+        }
+      }
+  },
+   "variables": {
+    "storageAccountName": "[format('bootdiags{0}', uniqueString(resourceGroup().id))]",
+    "nicName": "myVMNic",
+    "subnetRef": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'),  parameters('subnetName'))]"
+
+  },
+  "resources": [
+    
+    
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2021-02-01",
+      "name": "[variables('nicName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2021-03-01",
+      "name": "[parameters('vmName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "licenseType": "Windows_Client",
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('vmName')]",
+          "adminUsername": "appolotrn",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "provisionVMAgent": true,
+            "enableAutomaticUpdates": false,
+            "patchSettings": {
+                "patchMode": "Manual",
+                "assessmentMode": "ImageDefault",
+                "enableHotpatching": false
+            }
+        }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsDesktop",
+            "offer": "Windows-10",
+            "sku": "[parameters('OSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+            }
+          },
+          "dataDisks": [
+            {
+              "diskSizeGB": 1023,
+              "lun": 0,
+              "createOption": "Empty"
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": false            
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+        
+      ]
+    }
+  ]
+
+}
